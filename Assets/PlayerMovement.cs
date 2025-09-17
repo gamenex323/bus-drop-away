@@ -1,21 +1,27 @@
 ﻿using UnityEngine;
 
-public class CircularMovement : MonoBehaviour
+public class PlayerMovement : MonoBehaviour
 {
+    public GameManager.ColorData vehicleColor;
+    public int seatCapacity;
     public Transform centerPoint;   // The center of the circle
     public float radius = 5f;       // Circle radius
     public float speed = 2f;        // Rotation speed
     public bool detection;
+    public MeshRenderer mesh;
 
     private float angle = 0f;
-    private bool isMoving = false;  // Movement starts only after trigger exit
+    private bool isMovingInCircle = false; 
+    private bool isMovingForward = false; 
     private float cooldownTime;
     public float timeToDetect;
+    public LayerMask vehicleLayer;  // assign "Vehicle" layer in Inspector
 
     private void Start()
     {
         ResetTime();
     }
+
     public void ResetTime()
     {
         cooldownTime = timeToDetect;
@@ -23,18 +29,35 @@ public class CircularMovement : MonoBehaviour
 
     void Update()
     {
-        if (!isMoving) return;
-
-        cooldownTime-= Time.deltaTime;
-
-        if (cooldownTime < 0)
+        if (Input.GetMouseButtonDown(0))
         {
-            detection = true;
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            Debug.DrawRay(ray.origin, ray.direction * 100f, Color.red, 2f); // Debug ray in Scene view
+
+            if (Physics.Raycast(ray, out RaycastHit hit, 100f, vehicleLayer))
+            {
+                Debug.Log("Raycast hit Vehicle: " + hit.collider.name);
+
+                if (hit.transform == transform)
+                {
+                    Debug.Log("Tapped on vehicle player: " + gameObject.name);
+                    isMovingForward = true;
+                }
+            }
+            else
+            {
+                Debug.Log("Raycast did not hit any Vehicle layer object!");
+            }
         }
-        else
-        {
-            detection = false;
-        }
+
+        if(isMovingForward)
+            transform.Translate(Vector3.forward * speed * Time.deltaTime);
+
+        if (!isMovingInCircle) return;
+        isMovingForward = false;
+
+        cooldownTime -= Time.deltaTime;
+        detection = cooldownTime < 0;
 
         // Increase angle
         angle += speed * Time.deltaTime;
@@ -56,25 +79,41 @@ public class CircularMovement : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(tangent, Vector3.up);
     }
 
+
+
     private void OnTriggerExit(Collider other)
     {
         if (other.CompareTag("Circle"))
         {
-            // Calculate the starting angle from current position
+            // Calculate starting angle from current position
             Vector3 offset = transform.position - centerPoint.position;
             angle = Mathf.Atan2(-offset.z, offset.x); // anticlockwise start
-            isMoving = true;
+            isMovingInCircle = true;
         }
     }
+
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("StopPoint"))
         {
-            if (detection) 
+            if (detection)
             {
-                isMoving = false;
+                isMovingInCircle = false;
+                isMovingForward = true;
                 Debug.Log("Stopped at stopPoint: " + other.name);
             }
+        }
+    }
+
+    private void OnValidate()
+    {
+        try
+        {
+           mesh.material = GameManager.instance.GetColor(vehicleColor);
+        }
+        catch 
+        {
+            
         }
     }
 }
